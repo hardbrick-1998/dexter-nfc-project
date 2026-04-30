@@ -45,21 +45,35 @@
 
                     ndef.onreading = async event => {
                         const tagId = event.serialNumber;
+                        let tagText = "Tidak ada teks tertulis";
+
+                        // Logika untuk membaca pesan teks (NDEF) di dalam memori chip
+                        if (event.message && event.message.records && event.message.records.length > 0) {
+                            for (const record of event.message.records) {
+                                if (record.recordType === "text") {
+                                    const textDecoder = new TextDecoder(record.encoding);
+                                    tagText = textDecoder.decode(record.data);
+                                    break; // Berhenti mencari kalau teks sudah ketemu
+                                }
+                            }
+                        }
+
                         output.style.color = "#007bff";
-                        output.innerText = `✅ Terbaca ID: ${tagId}\nMengirim ke Spreadsheet...`;
+                        // Tampilkan UID dan Teks di layar HP
+                        output.innerText = `✅ UID: ${tagId}\n📝 Teks: ${tagText}\nMengirim ke Spreadsheet...`;
                         
                         // Proses kirim data ke Google Apps Script
                         try {
                             await fetch(BACKEND_URL, {
                                 method: "POST",
-                                mode: "no-cors", // Penting: Mode ini mencegah blokir keamanan antar website
+                                mode: "no-cors",
                                 headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ tag_id: tagId })
+                                // Kita kirim UID dan Teks-nya sekaligus ke database!
+                                body: JSON.stringify({ tag_id: tagId, tag_text: tagText }) 
                             });
                             
-                            // Karena 'no-cors' membuat respon tertutup, kita asumsikan berhasil jika tidak ada error jaringan
                             output.style.color = "#28a745";
-                            output.innerText = `✅ Sukses! ID ${tagId} terkirim ke Spreadsheet.`;
+                            output.innerText = `✅ Sukses!\nData ${tagText} terkirim.`;
                             
                         } catch (err) {
                             output.style.color = "#d9534f";
