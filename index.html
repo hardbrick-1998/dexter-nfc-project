@@ -3,33 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DEXTER NFC Scanner</title>
+    <title>DEXTER NFC - System</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 40px 20px; background-color: #f4f4f9; }
-        h2 { color: #333; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
-        button { padding: 15px 30px; font-size: 18px; background-color: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 20px; font-weight: bold;}
-        button:active { background-color: #218838; }
-        #output { margin-top: 20px; font-size: 16px; font-weight: bold; color: #666; padding: 15px; border: 2px dashed #ccc; border-radius: 8px; }
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f4f4f9; }
+        h2 { color: #333; margin-bottom: 5px; }
+        p { margin-top: 0; color: #666; }
+        
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 400px; margin: 10px auto; }
+        
+        /* Tombol Scan Utama */
+        .btn-scan { padding: 15px 30px; font-size: 18px; background-color: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px;}
+        .btn-scan:active { background-color: #218838; }
+        
+        /* Kotak Output */
+        #output { margin-top: 15px; font-size: 15px; font-weight: bold; color: #666; padding: 15px; border: 2px dashed #ccc; border-radius: 8px; white-space: pre-line;}
+        
+        /* Mode Admin UI */
+        .admin-trigger { margin-top: 30px; background: none; border: none; color: #aaa; cursor: pointer; font-size: 14px; text-decoration: underline; }
+        #adminPanel { display: none; background-color: #fff3cd; border: 2px solid #ffeeba; }
+        .input-box { width: 90%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; box-sizing: border-box; }
+        .btn-write { padding: 12px 20px; font-size: 16px; background-color: #fd7e14; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px;}
+        .btn-write:active { background-color: #e86c00; }
     </style>
 </head>
 <body>
 
+    <!-- PANEL SCAN (Untuk Publik/Mekanik) -->
     <div class="card">
         <h2>Project DEXTER</h2>
         <p>Flowmeter Tagging System</p>
         
         <div id="output">Siap untuk scan...</div>
-        <button id="scanButton">Tap Keyfob NFC</button>
+        <button id="scanButton" class="btn-scan">Tap Keyfob NFC</button>
+    </div>
+
+    <!-- TOMBOL RAHASIA ADMIN -->
+    <button id="showAdminBtn" class="admin-trigger">⚙️ Akses Admin (Write)</button>
+
+    <!-- PANEL WRITE (Tersembunyi, Khusus Admin) -->
+    <div id="adminPanel" class="card">
+        <h3 style="color: #856404; margin-top: 0;">🛠️ Admin: Write Keyfob</h3>
+        
+        <input type="text" id="tipeInput" class="input-box" placeholder="Tipe (Cth: Flowmeter LC M7)" value="Flowmeter LC M7">
+        <input type="text" id="snInput" class="input-box" placeholder="Nomor SN (Cth: 114816804)">
+        
+        <button id="writeButton" class="btn-write">Tulis ke Keyfob ✍️</button>
+        <div id="writeOutput" style="margin-top: 10px; font-size: 14px; font-weight: bold;"></div>
     </div>
 
     <script>
-        // MAS FAIZ: Wajib ganti tulisan di bawah ini dengan link "Web App URL" dari Google Apps Script
-        const BACKEND_URL = "https://script.google.com/macros/s/AKfycbzynzyPp1OQywvjxz3BeBolAGfIDf8-uX6al_qoqX3NY-67sVVpYyMsXt1ZyJ86JmWXxQ/exec"; 
+        // --- 1. CONFIGURATION ---
+        const BACKEND_URL = "https://script.google.com/macros/s/AKfycbwO1XN3TclSGB_c3-o71uK5y87lF0fQ-7a2W-8XjWqD2u1KqX8X7F0X4QyL0m4/exec"; 
+        const ADMIN_PASSWORD = "maco"; // PASSWORD ADMIN ADA DI SINI
 
+        // --- 2. LOGIKA SCANNER (PUBLIK) ---
         document.getElementById('scanButton').addEventListener('click', async () => {
             const output = document.getElementById('output');
-            
             try {
                 if ('NDEFReader' in window) {
                     output.style.color = "#f0ad4e";
@@ -38,54 +67,91 @@
                     const ndef = new NDEFReader();
                     await ndef.scan();
                     
-                    ndef.onreadingerror = () => {
-                        output.style.color = "#d9534f";
-                        output.innerText = "❌ Gagal baca. Coba geser sedikit posisinya.";
-                    };
-
                     ndef.onreading = async event => {
                         const tagId = event.serialNumber;
                         let tagText = "Tidak ada teks tertulis";
 
-                        // Logika untuk membaca pesan teks (NDEF) di dalam memori chip
+                        // Coba baca pesan NDEF
                         if (event.message && event.message.records && event.message.records.length > 0) {
                             for (const record of event.message.records) {
                                 if (record.recordType === "text") {
                                     const textDecoder = new TextDecoder(record.encoding);
                                     tagText = textDecoder.decode(record.data);
-                                    break; // Berhenti mencari kalau teks sudah ketemu
+                                    break;
                                 }
                             }
                         }
 
                         output.style.color = "#007bff";
-                        // Tampilkan UID dan Teks di layar HP
-                        output.innerText = `✅ UID: ${tagId}\n📝 Teks: ${tagText}\nMengirim ke Spreadsheet...`;
+                        output.innerText = `✅ UID: ${tagId}\n📝 Teks: ${tagText}\n\nMengirim ke Spreadsheet...`;
                         
-                        // Proses kirim data ke Google Apps Script
                         try {
                             await fetch(BACKEND_URL, {
                                 method: "POST",
                                 mode: "no-cors",
                                 headers: { "Content-Type": "application/json" },
-                                // Kita kirim UID dan Teks-nya sekaligus ke database!
-                                body: JSON.stringify({ tag_id: tagId, tag_text: tagText }) 
+                                body: JSON.stringify({ tag_id: tagId, tag_text: tagText })
                             });
                             
                             output.style.color = "#28a745";
                             output.innerText = `✅ Sukses!\nData ${tagText} terkirim.`;
-                            
                         } catch (err) {
                             output.style.color = "#d9534f";
-                            output.innerText = "❌ Gagal kirim. Pastikan HP ada koneksi internet.";
+                            output.innerText = "❌ Gagal kirim. Pastikan HP ada internet.";
                         }
                     };
                 } else {
-                    output.style.color = "#d9534f";
-                    output.innerText = "⚠️ Browser HP tidak support NFC. Gunakan Chrome Android.";
+                    output.innerText = "⚠️ Browser HP tidak support NFC.";
                 }
             } catch (error) {
                 output.innerText = `Error: ${error}`;
+            }
+        });
+
+        // --- 3. LOGIKA ADMIN PANEL & WRITE NFC ---
+        const showAdminBtn = document.getElementById('showAdminBtn');
+        const adminPanel = document.getElementById('adminPanel');
+
+        showAdminBtn.addEventListener('click', () => {
+            const pass = prompt("Masukkan Password Admin DEXTER:");
+            if (pass === ADMIN_PASSWORD) {
+                adminPanel.style.display = "block";
+                showAdminBtn.style.display = "none"; // Sembunyikan tombol
+                alert("Akses diberikan. Silakan write keyfob.");
+            } else if (pass !== null) {
+                alert("❌ Password Salah!");
+            }
+        });
+
+        document.getElementById('writeButton').addEventListener('click', async () => {
+            const tipe = document.getElementById('tipeInput').value.trim();
+            const sn = document.getElementById('snInput').value.trim();
+            const writeOut = document.getElementById('writeOutput');
+
+            if (!tipe || !sn) {
+                alert("Tipe dan Nomor SN tidak boleh kosong!");
+                return;
+            }
+
+            const dataToFormat = `${tipe} - SN : ${sn}`; // Menggabungkan teks otomatis
+
+            try {
+                if ('NDEFReader' in window) {
+                    writeOut.style.color = "#e86c00";
+                    writeOut.innerText = "⏳ Tempelkan Keyfob kosong ke HP...";
+                    
+                    const ndef = new NDEFReader();
+                    await ndef.write(dataToFormat); // Menulis ke chip
+                    
+                    writeOut.style.color = "#28a745";
+                    writeOut.innerText = `✅ Sukses menulis:\n"${dataToFormat}"`;
+                    document.getElementById('snInput').value = ""; // Kosongkan input SN setelah sukses
+                } else {
+                    writeOut.innerText = "NFC tidak didukung.";
+                }
+            } catch (error) {
+                writeOut.style.color = "#d9534f";
+                writeOut.innerText = `❌ Gagal menulis: ${error}`;
             }
         });
     </script>
