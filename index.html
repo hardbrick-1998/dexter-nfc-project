@@ -24,8 +24,8 @@
     </div>
 
     <script>
-        // MAS FAIZ: Alamat URL ini nanti kita ganti pakai link NGROK supaya HP bisa ngirim ke laptop
-        const BACKEND_URL = "http://localhost:5000/api/scan"; 
+        // MAS FAIZ: Wajib ganti tulisan di bawah ini dengan link "Web App URL" dari Google Apps Script
+        const BACKEND_URL = "https://script.google.com/macros/s/XXXXX_GANTI_DENGAN_URL_GAS_MAS_FAIZ_XXXXX/exec"; 
 
         document.getElementById('scanButton').addEventListener('click', async () => {
             const output = document.getElementById('output');
@@ -46,26 +46,24 @@
                     ndef.onreading = async event => {
                         const tagId = event.serialNumber;
                         output.style.color = "#007bff";
-                        output.innerText = `✅ Terbaca ID: ${tagId}\nMengirim ke DEXTER...`;
+                        output.innerText = `✅ Terbaca ID: ${tagId}\nMengirim ke Spreadsheet...`;
                         
-                        // Proses kirim data ke Python
+                        // Proses kirim data ke Google Apps Script
                         try {
-                            const response = await fetch(BACKEND_URL, {
+                            await fetch(BACKEND_URL, {
                                 method: "POST",
+                                mode: "no-cors", // Penting: Mode ini mencegah blokir keamanan antar website
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ tag_id: tagId })
                             });
                             
-                            const result = await response.json();
-                            if(response.ok) {
-                                output.style.color = "#28a745";
-                                output.innerText = `✅ Sukses! ${result.message}`;
-                            } else {
-                                throw new Error("Gagal simpan di database");
-                            }
+                            // Karena 'no-cors' membuat respon tertutup, kita asumsikan berhasil jika tidak ada error jaringan
+                            output.style.color = "#28a745";
+                            output.innerText = `✅ Sukses! ID ${tagId} terkirim ke Spreadsheet.`;
+                            
                         } catch (err) {
                             output.style.color = "#d9534f";
-                            output.innerText = "❌ Gagal kirim ke server. Pastikan server Python nyala.";
+                            output.innerText = "❌ Gagal kirim. Pastikan HP ada koneksi internet.";
                         }
                     };
                 } else {
